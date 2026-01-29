@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import json
 import uuid
 
 # Page configuration
@@ -166,7 +165,7 @@ if "tag_form_submitted" not in st.session_state:
 # Industries list
 INDUSTRIES = [
     "🏢 Cement",
-    "⚙️ Aluminium",
+    "⚙️ Aluminum",
     "🔩 Steel",
     "🛞 Tyre",
     "📄 Paper & Pulp",
@@ -474,7 +473,7 @@ def plant_hierarchy_screen():
         st.session_state.hierarchy_input_mode["plant"] = plant_input_type
 
         if plant_input_type == "Select Existing" and plant_options:
-            # Get index for selectbox based on session state
+            # Get index for select box based on session state
             plant_value = st.session_state.plant_hierarchy.get("plant", "")
             if plant_value in plant_options:
                 plant_idx = plant_options.index(plant_value) + 1
