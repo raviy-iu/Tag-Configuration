@@ -1,0 +1,2 @@
+Industry,Plant,Area,Equipment,Asset,DCS_Tag,Raw_Parameter,Generic_Tag,UUID,Tag_Description,UOM,Low_Low_Limit,Low_Limit,High_Limit,High_High_Limit
+Cement,STAR_CEMENT,LINE_2,KILN,GEAR_BOX,KL_432_GB_TT-02,KL_GB_TT-02,KILN_GEARBOX_TT_02,e7cefe9c-00cf-4ffc-b626-f17237fb112e,Second temp measured at kiln gear box,°C,0.0,1.0,9.0,10.0

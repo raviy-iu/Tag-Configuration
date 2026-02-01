@@ -88,7 +88,7 @@ if "tags_data" not in st.session_state:
             "Raw_Parameter",
             "Generic_Tag",
             "UUID",
-            "Metadata",
+            "Tag_Description",
             "UOM",
             "Low_Low_Limit",
             "Low_Limit",
@@ -141,10 +141,10 @@ if "generic_tags_mapping" not in st.session_state:
     st.session_state.generic_tags_mapping = pd.DataFrame(
         columns=["Generic_Tag", "Industry", "Equipment", "Count", "Last_Updated"]
     )
-# New dataframe to store Available Generic Tags with Metadata (from uploads)
+# New dataframe to store Available Generic Tags with Tag Description (from uploads)
 if "available_generic_tags" not in st.session_state:
     st.session_state.available_generic_tags = pd.DataFrame(
-        columns=["Generic_Tag", "UUID", "Metadata", "Industry", "Equipment"]
+        columns=["Generic_Tag", "UUID", "Tag_Description", "Industry", "Equipment"]
     )
 # Track if user selected "+ Add New" for generic tag
 if "show_new_generic_tag" not in st.session_state:
@@ -243,8 +243,8 @@ def get_generic_tags_for_equipment(industry, equipment):
     return []
 
 
-def get_metadata_for_generic_tag(generic_tag, industry, equipment):
-    """Get metadata for a specific generic tag based on industry and equipment"""
+def get_tag_description_for_generic_tag(generic_tag, industry, equipment):
+    """Get tag description for a specific generic tag based on industry and equipment"""
     if st.session_state.available_generic_tags.empty or not generic_tag:
         return ""
 
@@ -256,7 +256,7 @@ def get_metadata_for_generic_tag(generic_tag, industry, equipment):
     ]
 
     if not filtered.empty:
-        return filtered.iloc[0]["Metadata"]
+        return filtered.iloc[0]["Tag_Description"]
 
     # If no exact match, try with just generic tag and industry
     filtered = st.session_state.available_generic_tags[
@@ -265,12 +265,12 @@ def get_metadata_for_generic_tag(generic_tag, industry, equipment):
     ]
 
     if not filtered.empty:
-        return filtered.iloc[0]["Metadata"]
+        return filtered.iloc[0]["Tag_Description"]
 
     return ""
 
 
-def get_or_create_uuid_for_generic_tag(generic_tag, industry, equipment, metadata=""):
+def get_or_create_uuid_for_generic_tag(generic_tag, industry, equipment, tag_description=""):
     """Get existing UUID or create a new one for a generic tag"""
     if not generic_tag:
         return ""
@@ -302,7 +302,7 @@ def get_or_create_uuid_for_generic_tag(generic_tag, industry, equipment, metadat
     new_entry = pd.DataFrame([{
         "Generic_Tag": generic_tag,
         "UUID": new_uuid,
-        "Metadata": metadata,
+        "Tag_Description": tag_description,
         "Industry": industry,
         "Equipment": equipment,
     }])
@@ -329,12 +329,16 @@ def quick_actions_sidebar():
             st.session_state.page = "hierarchy"
             st.rerun()
 
-        if st.button("📝 Configure Tags", use_container_width=True, key="qa_tags", disabled=(st.session_state.page == "welcome")):
+        if st.button("📝 Configure New Tags", use_container_width=True, key="qa_tags", disabled=(st.session_state.page == "welcome")):
             st.session_state.page = "tags"
             st.rerun()
 
         if st.button("📊 View Summary", use_container_width=True, key="qa_summary"):
             st.session_state.page = "summary"
+            st.rerun()
+
+        if st.button("✏️ Update Tags Metadata", use_container_width=True, key="qa_update_tags"):
+            st.session_state.page = "edit_tags"
             st.rerun()
 
         st.markdown("---")
@@ -807,7 +811,7 @@ def tags_configuration_screen():
                 "generic_tag_select": "",
                 "new_generic_tag": "",
                 "uuid": "",
-                "metadata": "",
+                "tag_description": "",
                 "uom_select": "",
                 "new_uom": "",
                 "low_low_limit": 0.0,
@@ -846,7 +850,7 @@ def tags_configuration_screen():
                 "generic_tag_select": "",
                 "new_generic_tag": "",
                 "uuid": "",
-                "metadata": "",
+                "tag_description": "",
                 "uom_select": "",
                 "new_uom": "",
                 "low_low_limit": 0.0,
@@ -859,7 +863,7 @@ def tags_configuration_screen():
                 "dcs_tag_input", "raw_param_input", "generic_tag_select",
                 "new_generic_tag", "uom_select", "new_uom",
                 "low_low_input", "low_input", "high_input", "high_high_input",
-                "uuid_display", "metadata_input"
+                "uuid_display", "tag_description_input"
             ]
             for key in widget_keys:
                 if key in st.session_state:
@@ -883,7 +887,7 @@ def tags_configuration_screen():
             "generic_tag_select": "",
             "new_generic_tag": "",
             "uuid": "",
-            "metadata": "",
+            "tag_description": "",
             "uom_select": "",
             "new_uom": "",
             "low_low_limit": 0.0,
@@ -1046,7 +1050,7 @@ def tags_configuration_screen():
                 st.session_state.tag_input_values["high_high_limit"] = high_high_limit
 
                 # Update metadata and UUID when form is submitted
-                auto_metadata = get_metadata_for_generic_tag(
+                auto_metadata = get_tag_description_for_generic_tag(
                     generic_tag,
                     st.session_state.selected_industry,
                     hierarchy["equipment"]
@@ -1057,14 +1061,14 @@ def tags_configuration_screen():
                     hierarchy["equipment"],
                     auto_metadata
                 )
-                st.session_state.tag_input_values["metadata"] = auto_metadata
+                st.session_state.tag_input_values["tag_description"] = auto_metadata
                 st.session_state.tag_input_values["uuid"] = auto_uuid
                 st.session_state.tag_form_submitted = True
                 st.rerun()
             else:
                 st.error("⚠️ Please fill all required fields (marked with *) before submitting")
 
-    # Section 2: UUID and Metadata (shown only after Submit)
+    # Section 2: UUID and Tag Description (shown only after Submit)
     if st.session_state.tag_form_submitted:
         st.markdown("---")
         st.markdown("### 📋 Section 2: Generated Information")
@@ -1082,23 +1086,27 @@ def tags_configuration_screen():
             )
 
         with col2:
-            metadata = st.text_area(
-                "Metadata",
-                placeholder="Additional information",
-                value=st.session_state.tag_input_values["metadata"],
+            tag_description = st.text_area(
+                "Tag Description *",
+                placeholder="Enter tag description (required)",
+                value=st.session_state.tag_input_values["tag_description"],
                 height=100,
-                key="metadata_input",
+                key="tag_description_input",
             )
 
-            # Update session state with current metadata value (user may have edited it)
-            if metadata != st.session_state.tag_input_values["metadata"]:
-                st.session_state.tag_input_values["metadata"] = metadata
+            # Update session state with current tag description value (user may have edited it)
+            if tag_description != st.session_state.tag_input_values["tag_description"]:
+                st.session_state.tag_input_values["tag_description"] = tag_description
 
-        # Add Tag button (shown only after Submit)
+        # Add Tag button (shown only after Submit) - requires Tag Description
         st.markdown("---")
         add_tag_col1, add_tag_col2, add_tag_col3 = st.columns([1, 1, 1])
         with add_tag_col2:
-            if st.button("➕ Add Tag", type="primary", use_container_width=True):
+            # Check if tag description is filled
+            tag_description_filled = bool(st.session_state.tag_input_values.get("tag_description", "").strip())
+            if not tag_description_filled:
+                st.warning("⚠️ Tag Description is required to add a tag")
+            if st.button("➕ Add Tag", type="primary", use_container_width=True, disabled=not tag_description_filled):
                 # Get all values from session state
                 dcs_tag = st.session_state.tag_input_values["dcs_tag"]
                 raw_parameter = st.session_state.tag_input_values["raw_parameter"]
@@ -1108,7 +1116,7 @@ def tags_configuration_screen():
                 low_limit = st.session_state.tag_input_values["low_limit"]
                 high_limit = st.session_state.tag_input_values["high_limit"]
                 high_high_limit = st.session_state.tag_input_values["high_high_limit"]
-                metadata = st.session_state.tag_input_values["metadata"]
+                tag_description = st.session_state.tag_input_values["tag_description"]
                 tag_uuid = st.session_state.tag_input_values["uuid"]
 
                 # Add new generic tag to list if custom
@@ -1120,7 +1128,7 @@ def tags_configuration_screen():
                     st.session_state.generic_tags.append(generic_tag)
                     st.session_state.generic_tags.sort()
 
-                # Update or add metadata to available_generic_tags
+                # Update or add tag description to available_generic_tags
                 # Check if entry already exists for this generic tag, industry, equipment combination
                 existing_mask = (
                     (st.session_state.available_generic_tags["Generic_Tag"] == generic_tag)
@@ -1129,15 +1137,15 @@ def tags_configuration_screen():
                 )
 
                 if not st.session_state.available_generic_tags.empty and existing_mask.any():
-                    # Update existing entry with potentially edited metadata
+                    # Update existing entry with potentially edited tag description
                     idx = st.session_state.available_generic_tags[existing_mask].index[0]
-                    st.session_state.available_generic_tags.loc[idx, "Metadata"] = metadata
+                    st.session_state.available_generic_tags.loc[idx, "Tag_Description"] = tag_description
                 else:
                     # Entry doesn't exist, add it (this shouldn't happen normally as it was created on Submit)
                     new_entry = pd.DataFrame([{
                         "Generic_Tag": generic_tag,
                         "UUID": tag_uuid,
-                        "Metadata": metadata,
+                        "Tag_Description": tag_description,
                         "Industry": st.session_state.selected_industry,
                         "Equipment": hierarchy["equipment"],
                     }])
@@ -1171,7 +1179,7 @@ def tags_configuration_screen():
                     "Raw_Parameter": raw_parameter,
                     "Generic_Tag": generic_tag,
                     "UUID": tag_uuid,
-                    "Metadata": metadata,
+                    "Tag_Description": tag_description,
                     "UOM": uom,
                     "Low_Low_Limit": low_low_limit,
                     "Low_Limit": low_limit,
@@ -1188,7 +1196,7 @@ def tags_configuration_screen():
                     "generic_tag_select": "",
                     "new_generic_tag": "",
                     "uuid": "",
-                    "metadata": "",
+                    "tag_description": "",
                     "uom_select": "",
                     "new_uom": "",
                     "low_low_limit": 0.0,
@@ -1232,7 +1240,7 @@ def tags_configuration_screen():
                     st.write(f"**UUID:** {row['UUID'] if row['UUID'] else 'N/A'}")
                     st.write(f"**UOM:** {row['UOM']}")
                     st.write(
-                        f"**Metadata:** {row['Metadata'] if row['Metadata'] else 'N/A'}"
+                        f"**Tag Description:** {row['Tag_Description'] if row['Tag_Description'] else 'N/A'}"
                     )
 
                 with col2:
@@ -1279,7 +1287,7 @@ def upload_generic_tags_screen():
 
     st.markdown("---")
 
-    st.info("💡 Upload a CSV or Excel file with 'Generic Tag' and 'Metadata' columns for a specific Industry and Equipment combination.")
+    st.info("💡 Upload a CSV or Excel file with 'Generic Tag' and 'Tag Description' columns for a specific Industry and Equipment combination.")
 
     # Industry and Equipment selection
     col1, col2 = st.columns(2)
@@ -1332,7 +1340,7 @@ def upload_generic_tags_screen():
     uploaded_file = st.file_uploader(
         "Choose a CSV or Excel file",
         type=["csv", "xlsx", "xls"],
-        help="File should contain at least 'Generic Tag' and 'Metadata' columns"
+        help="File should contain at least 'Generic Tag' and 'Tag Description' columns"
     )
 
     if uploaded_file is not None:
@@ -1349,7 +1357,7 @@ def upload_generic_tags_screen():
             st.dataframe(df_preview.head(10), use_container_width=True, hide_index=True)
 
             # Check if required columns exist
-            required_columns = ['Generic Tag', 'Metadata']
+            required_columns = ['Generic Tag', 'Tag Description']
             missing_columns = [col for col in required_columns if col not in df_preview.columns]
 
             if missing_columns:
@@ -1365,7 +1373,7 @@ def upload_generic_tags_screen():
                         new_rows = []
                         for _, row in df_preview.iterrows():
                             generic_tag = row['Generic Tag']
-                            metadata = row.get('Metadata', '')
+                            tag_description = row.get('Tag Description', '')
 
                             # Generate UUID for this generic tag
                             tag_uuid = str(uuid.uuid4())
@@ -1386,7 +1394,7 @@ def upload_generic_tags_screen():
                             new_entry = {
                                 "Generic_Tag": generic_tag,
                                 "UUID": tag_uuid,
-                                "Metadata": metadata,
+                                "Tag_Description": tag_description,
                                 "Industry": selected_industry,
                                 "Equipment": selected_equipment,
                             }
@@ -1422,11 +1430,11 @@ def summary_screen():
     # Track current page
     st.session_state.last_page = "summary"
 
-    st.title("📊 Configuration Summary")
+    st.title("📊 New Tags Configuration Summary")
     st.markdown("---")
 
     # Tabs for different dataframes
-    tab1, tab2 = st.tabs(["📋 Tags Configured", "🏷️ Available Generic Tags with Metadata"])
+    tab1, tab2 = st.tabs(["📋 Tags Configured", "🏷️ Available Generic Tags with Tag Description"])
 
     with tab1:
         # Display complete dataframe
@@ -1440,6 +1448,14 @@ def summary_screen():
             st.dataframe(
                 st.session_state.tags_data, use_container_width=True, hide_index=True
             )
+
+            # Create button to save tag_metadata.csv
+            st.markdown("---")
+            st.subheader("💾 Save to Tag Metadata")
+            if st.button("✅ Create", type="primary", use_container_width=True, key="create_tag_metadata"):
+                # Save tags_data to tag_metadata.csv
+                st.session_state.tags_data.to_csv("tag_metadata.csv", index=False)
+                st.success("✅ tag_metadata.csv created successfully!")
 
             # Export options
             st.markdown("---")
@@ -1488,7 +1504,7 @@ def summary_screen():
             st.info("No configuration data available yet.")
 
     with tab2:
-        # Display Available Generic Tags with Metadata
+        # Display Available Generic Tags with Tag Description
         if not st.session_state.available_generic_tags.empty:
             st.subheader("Available Generic Tags by Industry & Equipment")
 
@@ -1540,8 +1556,8 @@ def summary_screen():
                 ]
 
                 if not filtered_data.empty:
-                    # Create a dataframe with Generic_Tag, UUID, and Metadata columns
-                    result_df = filtered_data[["Generic_Tag", "UUID", "Metadata"]].copy()
+                    # Create a dataframe with Generic_Tag, UUID, and Tag_Description columns
+                    result_df = filtered_data[["Generic_Tag", "UUID", "Tag_Description"]].copy()
 
                     # Display the filtered dataframe
                     st.dataframe(result_df, use_container_width=True, hide_index=True)
@@ -1595,11 +1611,11 @@ def summary_screen():
                     )
             elif selected_industry_filter:
                 st.info(
-                    "💡 Please select an equipment to view generic tags and metadata"
+                    "💡 Please select an equipment to view generic tags and tag description"
                 )
             else:
                 st.info(
-                    "💡 Please select an industry and equipment to view generic tags and metadata"
+                    "💡 Please select an industry and equipment to view generic tags and tag description"
                 )
 
             # Export Available Generic Tags
@@ -1653,6 +1669,431 @@ def summary_screen():
             )
 
 
+def edit_tags_screen():
+    """Display edit existing tags screen"""
+    quick_actions_sidebar()
+
+    # Track current page
+    st.session_state.last_page = "edit_tags"
+
+    st.title("✏️ Edit Existing Tags")
+    st.markdown("---")
+
+    # Initialize session state for edit mode
+    if "edit_tags_df" not in st.session_state:
+        st.session_state.edit_tags_df = pd.DataFrame()
+    if "selected_tag_indices" not in st.session_state:
+        st.session_state.selected_tag_indices = []
+    if "editing_tag_index" not in st.session_state:
+        st.session_state.editing_tag_index = None
+
+    # Load tags from tag_metadata.csv
+    import os
+    csv_path = "tag_metadata.csv"
+
+    if os.path.exists(csv_path):
+        # Load fresh data from CSV
+        if st.session_state.edit_tags_df.empty or st.button("🔄 Refresh Data", key="refresh_csv"):
+            st.session_state.edit_tags_df = pd.read_csv(csv_path)
+            st.session_state.selected_tag_indices = []
+            st.session_state.editing_tag_index = None
+
+        if not st.session_state.edit_tags_df.empty:
+            st.subheader(f"📋 Tags from tag_metadata.csv ({len(st.session_state.edit_tags_df)} records)")
+
+            # Create a container for the table with checkboxes
+            df = st.session_state.edit_tags_df.copy()
+
+            # Display table with checkboxes and edit buttons
+            for idx, row in df.iterrows():
+                col_select, col_data, col_edit = st.columns([0.5, 8, 1.5])
+
+                with col_select:
+                    is_selected = st.checkbox("", key=f"select_{idx}", value=(idx in st.session_state.selected_tag_indices))
+                    if is_selected and idx not in st.session_state.selected_tag_indices:
+                        st.session_state.selected_tag_indices.append(idx)
+                    elif not is_selected and idx in st.session_state.selected_tag_indices:
+                        st.session_state.selected_tag_indices.remove(idx)
+
+                with col_data:
+                    # Display row data in a compact format
+                    st.markdown(
+                        f"**{row.get('DCS_Tag', 'N/A')}** | {row.get('Raw_Parameter', 'N/A')} | "
+                        f"{row.get('Generic_Tag', 'N/A')} | {row.get('Equipment', 'N/A')} | "
+                        f"{row.get('UOM', 'N/A')}"
+                    )
+
+                with col_edit:
+                    # Edit button only active when row is selected
+                    if idx in st.session_state.selected_tag_indices:
+                        if st.button("✏️ Edit", key=f"edit_{idx}", type="primary"):
+                            st.session_state.editing_tag_index = idx
+                            st.rerun()
+                    else:
+                        st.button("✏️ Edit", key=f"edit_{idx}", disabled=True)
+
+            # Show full table in expander
+            with st.expander("📊 View Full Table", expanded=False):
+                st.dataframe(df, use_container_width=True, hide_index=True)
+
+            st.markdown("---")
+
+            # Edit form - shown when a tag is selected for editing
+            if st.session_state.editing_tag_index is not None:
+                idx = st.session_state.editing_tag_index
+                row = st.session_state.edit_tags_df.iloc[idx]
+
+                st.subheader(f"✏️ Editing Tag: {row.get('DCS_Tag', 'N/A')}")
+
+                # Initialize edit form values in session state if not present
+                if "edit_form_values" not in st.session_state:
+                    st.session_state.edit_form_values = {}
+
+                # Initialize values for this editing session
+                if st.session_state.edit_form_values.get("editing_idx") != idx:
+                    current_industry = str(row.get('Industry', ''))
+                    current_equipment = str(row.get('Equipment', ''))
+                    st.session_state.edit_form_values = {
+                        "editing_idx": idx,
+                        "dcs_tag": str(row.get('DCS_Tag', '')),
+                        "raw_parameter": str(row.get('Raw_Parameter', '')),
+                        "generic_tag": str(row.get('Generic_Tag', '')),
+                        "original_generic_tag": str(row.get('Generic_Tag', '')),  # Track original for comparison
+                        "uuid": str(row.get('UUID', '')),
+                        "uom": str(row.get('UOM', '')),
+                        "tag_description": str(row.get('Tag_Description', '')),
+                        "industry": current_industry,
+                        "plant": str(row.get('Plant', '')),
+                        "area": str(row.get('Area', '')),
+                        "equipment": current_equipment,
+                        "asset": str(row.get('Asset', '')),
+                        "low_low_limit": float(row.get('Low_Low_Limit', 0.0)),
+                        "low_limit": float(row.get('Low_Limit', 0.0)),
+                        "high_limit": float(row.get('High_Limit', 0.0)),
+                        "high_high_limit": float(row.get('High_High_Limit', 0.0)),
+                        "show_new_generic_tag": False,
+                        "is_new_generic_tag": False,  # Track if this is a new generic tag
+                    }
+
+                # Get available generic tags from available_generic_tags dataframe
+                current_industry = st.session_state.edit_form_values.get("industry", "")
+                current_equipment = st.session_state.edit_form_values.get("equipment", "")
+
+                # Get generic tags for this industry and equipment
+                available_tags = get_generic_tags_for_equipment(current_industry, current_equipment)
+
+                # Combine with default generic tags
+                if available_tags:
+                    combined_tags = available_tags + [
+                        tag for tag in st.session_state.generic_tags if tag not in available_tags
+                    ]
+                else:
+                    combined_tags = st.session_state.generic_tags.copy()
+
+                # Add "+ Add New" option
+                combined_tags_with_new = combined_tags + ["+ Add New"]
+
+                col1, col2 = st.columns(2)
+
+                with col1:
+                    edit_dcs_tag = st.text_input(
+                        "DCS Tag *",
+                        value=st.session_state.edit_form_values["dcs_tag"],
+                        key="edit_dcs_tag_input"
+                    )
+                    st.session_state.edit_form_values["dcs_tag"] = edit_dcs_tag
+
+                    edit_raw_parameter = st.text_input(
+                        "Raw Parameter *",
+                        value=st.session_state.edit_form_values["raw_parameter"],
+                        key="edit_raw_param_input"
+                    )
+                    st.session_state.edit_form_values["raw_parameter"] = edit_raw_parameter
+
+                    # Generic Tag dropdown with available_generic_tags
+                    current_generic_tag = st.session_state.edit_form_values["generic_tag"]
+
+                    # Determine index for selectbox
+                    if current_generic_tag in combined_tags_with_new:
+                        generic_idx = combined_tags_with_new.index(current_generic_tag) + 1
+                    elif current_generic_tag:
+                        # If current tag not in list, add it temporarily
+                        combined_tags_with_new = [current_generic_tag] + combined_tags_with_new
+                        generic_idx = 1
+                    else:
+                        generic_idx = 0
+
+                    generic_tag_option = st.selectbox(
+                        "Generic Tag *",
+                        [""] + combined_tags_with_new,
+                        index=generic_idx,
+                        key="edit_generic_tag_select"
+                    )
+
+                    # Handle "+ Add New" selection
+                    if generic_tag_option == "+ Add New":
+                        st.session_state.edit_form_values["show_new_generic_tag"] = True
+                        st.session_state.edit_form_values["is_new_generic_tag"] = True
+                    else:
+                        st.session_state.edit_form_values["show_new_generic_tag"] = False
+                        st.session_state.edit_form_values["is_new_generic_tag"] = False
+
+                    # Show text input for new generic tag
+                    if st.session_state.edit_form_values["show_new_generic_tag"]:
+                        edit_generic_tag = st.text_input(
+                            "Enter New Generic Tag",
+                            value="",
+                            key="edit_new_generic_tag_input"
+                        )
+                        # Generate new UUID for new generic tag
+                        if edit_generic_tag:
+                            if st.session_state.edit_form_values.get("new_tag_name") != edit_generic_tag:
+                                # New tag name entered, generate new UUID
+                                st.session_state.edit_form_values["uuid"] = str(uuid.uuid4())
+                                st.session_state.edit_form_values["new_tag_name"] = edit_generic_tag
+                                st.session_state.edit_form_values["tag_description"] = ""  # Clear tag description for new tag
+                    else:
+                        edit_generic_tag = generic_tag_option
+
+                        # Update tag description and UUID when generic tag changes
+                        if edit_generic_tag and edit_generic_tag != st.session_state.edit_form_values.get("last_generic_tag", ""):
+                            # Get tag description for this generic tag
+                            auto_tag_description = get_tag_description_for_generic_tag(
+                                edit_generic_tag,
+                                current_industry,
+                                current_equipment
+                            )
+                            if auto_tag_description:
+                                st.session_state.edit_form_values["tag_description"] = auto_tag_description
+
+                            # Get existing UUID for this generic tag from available_generic_tags
+                            if not st.session_state.available_generic_tags.empty:
+                                filtered = st.session_state.available_generic_tags[
+                                    (st.session_state.available_generic_tags["Generic_Tag"] == edit_generic_tag)
+                                    & (st.session_state.available_generic_tags["Industry"] == current_industry)
+                                    & (st.session_state.available_generic_tags["Equipment"] == current_equipment)
+                                ]
+                                if not filtered.empty:
+                                    st.session_state.edit_form_values["uuid"] = filtered.iloc[0]["UUID"]
+                                else:
+                                    # Try with just industry
+                                    filtered = st.session_state.available_generic_tags[
+                                        (st.session_state.available_generic_tags["Generic_Tag"] == edit_generic_tag)
+                                        & (st.session_state.available_generic_tags["Industry"] == current_industry)
+                                    ]
+                                    if not filtered.empty:
+                                        st.session_state.edit_form_values["uuid"] = filtered.iloc[0]["UUID"]
+
+                            st.session_state.edit_form_values["last_generic_tag"] = edit_generic_tag
+
+                    st.session_state.edit_form_values["generic_tag"] = edit_generic_tag
+
+                    # Display UUID (read-only)
+                    st.text_input(
+                        "UUID (Auto-generated)",
+                        value=st.session_state.edit_form_values.get("uuid", ""),
+                        key="edit_uuid_display",
+                        disabled=True,
+                        help="UUID is immutable once a generic tag is created. New generic tags get new UUIDs."
+                    )
+
+                    # UOM
+                    current_uom = st.session_state.edit_form_values["uom"]
+                    if current_uom in st.session_state.uom_list:
+                        uom_idx = st.session_state.uom_list.index(current_uom) + 1
+                    else:
+                        uom_idx = 0
+                    edit_uom = st.selectbox(
+                        "UOM *",
+                        [""] + st.session_state.uom_list,
+                        index=uom_idx,
+                        key="edit_uom_select"
+                    )
+                    st.session_state.edit_form_values["uom"] = edit_uom
+
+                    edit_tag_description = st.text_area(
+                        "Tag Description *",
+                        value=st.session_state.edit_form_values["tag_description"],
+                        key="edit_tag_description_input"
+                    )
+                    st.session_state.edit_form_values["tag_description"] = edit_tag_description
+
+                with col2:
+                    edit_industry = st.text_input(
+                        "Industry",
+                        value=st.session_state.edit_form_values["industry"],
+                        key="edit_industry_input"
+                    )
+                    st.session_state.edit_form_values["industry"] = edit_industry
+
+                    edit_plant = st.text_input(
+                        "Plant",
+                        value=st.session_state.edit_form_values["plant"],
+                        key="edit_plant_input"
+                    )
+                    st.session_state.edit_form_values["plant"] = edit_plant
+
+                    edit_area = st.text_input(
+                        "Area",
+                        value=st.session_state.edit_form_values["area"],
+                        key="edit_area_input"
+                    )
+                    st.session_state.edit_form_values["area"] = edit_area
+
+                    edit_equipment = st.text_input(
+                        "Equipment",
+                        value=st.session_state.edit_form_values["equipment"],
+                        key="edit_equipment_input"
+                    )
+                    st.session_state.edit_form_values["equipment"] = edit_equipment
+
+                    edit_asset = st.text_input(
+                        "Asset",
+                        value=st.session_state.edit_form_values["asset"],
+                        key="edit_asset_input"
+                    )
+                    st.session_state.edit_form_values["asset"] = edit_asset
+
+                st.markdown("#### Limits")
+                limit_col1, limit_col2, limit_col3, limit_col4 = st.columns(4)
+
+                with limit_col1:
+                    edit_low_low = st.number_input(
+                        "Low-Low Limit",
+                        value=st.session_state.edit_form_values["low_low_limit"],
+                        format="%.2f",
+                        key="edit_low_low_input"
+                    )
+                    st.session_state.edit_form_values["low_low_limit"] = edit_low_low
+
+                with limit_col2:
+                    edit_low = st.number_input(
+                        "Low Limit",
+                        value=st.session_state.edit_form_values["low_limit"],
+                        format="%.2f",
+                        key="edit_low_input"
+                    )
+                    st.session_state.edit_form_values["low_limit"] = edit_low
+
+                with limit_col3:
+                    edit_high = st.number_input(
+                        "High Limit",
+                        value=st.session_state.edit_form_values["high_limit"],
+                        format="%.2f",
+                        key="edit_high_input"
+                    )
+                    st.session_state.edit_form_values["high_limit"] = edit_high
+
+                with limit_col4:
+                    edit_high_high = st.number_input(
+                        "High-High Limit",
+                        value=st.session_state.edit_form_values["high_high_limit"],
+                        format="%.2f",
+                        key="edit_high_high_input"
+                    )
+                    st.session_state.edit_form_values["high_high_limit"] = edit_high_high
+
+                st.markdown("---")
+                col_save, col_cancel = st.columns(2)
+
+                with col_save:
+                    if st.button("💾 Save Changes", type="primary", use_container_width=True, key="save_edit_btn"):
+                        edit_generic_tag = st.session_state.edit_form_values["generic_tag"]
+                        edit_dcs_tag = st.session_state.edit_form_values["dcs_tag"]
+                        edit_uom = st.session_state.edit_form_values["uom"]
+                        edit_raw_parameter = st.session_state.edit_form_values["raw_parameter"]
+                        edit_uuid = st.session_state.edit_form_values.get("uuid", "")
+
+                        if edit_dcs_tag and edit_raw_parameter and edit_generic_tag and edit_uom:
+                            # Add new generic tag to list if it's a new one
+                            if st.session_state.edit_form_values.get("is_new_generic_tag") and edit_generic_tag:
+                                if edit_generic_tag not in st.session_state.generic_tags:
+                                    st.session_state.generic_tags.append(edit_generic_tag)
+                                    st.session_state.generic_tags.sort()
+
+                            # Update the dataframe
+                            st.session_state.edit_tags_df.loc[idx, 'DCS_Tag'] = edit_dcs_tag
+                            st.session_state.edit_tags_df.loc[idx, 'Raw_Parameter'] = edit_raw_parameter
+                            st.session_state.edit_tags_df.loc[idx, 'Generic_Tag'] = edit_generic_tag
+                            st.session_state.edit_tags_df.loc[idx, 'UUID'] = edit_uuid
+                            st.session_state.edit_tags_df.loc[idx, 'UOM'] = edit_uom
+                            st.session_state.edit_tags_df.loc[idx, 'Tag_Description'] = st.session_state.edit_form_values["tag_description"]
+                            st.session_state.edit_tags_df.loc[idx, 'Industry'] = st.session_state.edit_form_values["industry"]
+                            st.session_state.edit_tags_df.loc[idx, 'Plant'] = st.session_state.edit_form_values["plant"]
+                            st.session_state.edit_tags_df.loc[idx, 'Area'] = st.session_state.edit_form_values["area"]
+                            st.session_state.edit_tags_df.loc[idx, 'Equipment'] = st.session_state.edit_form_values["equipment"]
+                            st.session_state.edit_tags_df.loc[idx, 'Asset'] = st.session_state.edit_form_values["asset"]
+                            st.session_state.edit_tags_df.loc[idx, 'Low_Low_Limit'] = st.session_state.edit_form_values["low_low_limit"]
+                            st.session_state.edit_tags_df.loc[idx, 'Low_Limit'] = st.session_state.edit_form_values["low_limit"]
+                            st.session_state.edit_tags_df.loc[idx, 'High_Limit'] = st.session_state.edit_form_values["high_limit"]
+                            st.session_state.edit_tags_df.loc[idx, 'High_High_Limit'] = st.session_state.edit_form_values["high_high_limit"]
+
+                            st.session_state.editing_tag_index = None
+                            st.session_state.selected_tag_indices = []
+                            st.session_state.edit_form_values = {}
+                            st.success(f"✅ Tag '{edit_dcs_tag}' updated successfully!")
+                            st.rerun()
+                        else:
+                            st.error("⚠️ Please fill all required fields (marked with *)")
+
+                with col_cancel:
+                    if st.button("❌ Cancel", use_container_width=True, key="cancel_edit_btn"):
+                        st.session_state.editing_tag_index = None
+                        st.session_state.edit_form_values = {}
+                        st.rerun()
+
+            # Update & Save button
+            st.markdown("---")
+            if st.button("💾 Update & Save", type="primary", use_container_width=True, key="update_save_csv"):
+                # Save to tag_metadata.csv
+                st.session_state.edit_tags_df.to_csv(csv_path, index=False)
+
+                # Update 'Tags Configured' (tags_data) - replace with edited data
+                st.session_state.tags_data = st.session_state.edit_tags_df.copy()
+
+                # Update 'Available Generic Tags with Tag Description' - append new entries only
+                # Generic tags are immutable once created with their UUID
+                for _, row in st.session_state.edit_tags_df.iterrows():
+                    generic_tag = row.get('Generic_Tag', '')
+                    tag_uuid = row.get('UUID', '')
+                    tag_description = row.get('Tag_Description', '')
+                    industry = row.get('Industry', '')
+                    equipment = row.get('Equipment', '')
+
+                    if generic_tag and tag_uuid:
+                        # Check if this generic tag + industry + equipment combination already exists
+                        existing_mask = (
+                            (st.session_state.available_generic_tags["Generic_Tag"] == generic_tag)
+                            & (st.session_state.available_generic_tags["Industry"] == industry)
+                            & (st.session_state.available_generic_tags["Equipment"] == equipment)
+                        )
+
+                        if st.session_state.available_generic_tags.empty or not existing_mask.any():
+                            # Append new entry (generic tags are immutable, only add if not exists)
+                            new_entry = pd.DataFrame([{
+                                "Generic_Tag": generic_tag,
+                                "UUID": tag_uuid,
+                                "Tag_Description": tag_description,
+                                "Industry": industry,
+                                "Equipment": equipment,
+                            }])
+                            st.session_state.available_generic_tags = pd.concat(
+                                [st.session_state.available_generic_tags, new_entry],
+                                ignore_index=True
+                            )
+
+                st.success("✅ tag_metadata.csv, Tags Configured, and Available Generic Tags updated successfully!")
+
+        else:
+            st.info("📂 tag_metadata.csv is empty. Configure some tags first.")
+    else:
+        st.warning("⚠️ tag_metadata.csv not found. Please configure tags and click 'Create' in the Summary page first.")
+
+        if st.button("← Go to Summary", type="primary"):
+            st.session_state.page = "summary"
+            st.rerun()
+
+
 # Main app logic
 def main():
     if st.session_state.page == "welcome":
@@ -1665,6 +2106,8 @@ def main():
         summary_screen()
     elif st.session_state.page == "upload":
         upload_generic_tags_screen()
+    elif st.session_state.page == "edit_tags":
+        edit_tags_screen()
 
 
 if __name__ == "__main__":
